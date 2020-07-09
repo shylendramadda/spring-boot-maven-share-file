@@ -1,4 +1,4 @@
-package com.techatcore.ShareFile;
+package com.techatcore.sharefile;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
