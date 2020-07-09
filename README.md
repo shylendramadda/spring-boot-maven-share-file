@@ -29,5 +29,5 @@ Goal of this project is to create service for file sharing (Upload, download, sh
 - http://localhost:8085/h2-console
 
 ### To make it work change the following lines in the application.properties file
-file.upload-path=D:/Shylendra/FileStorage
-spring.datasource.url=jdbc:h2:file:D:/Shylendra/FileStorage  
+- file.upload-path=D:/Shylendra/FileStorage
+- spring.datasource.url=jdbc:h2:file:D:/Shylendra/FileStorage  
