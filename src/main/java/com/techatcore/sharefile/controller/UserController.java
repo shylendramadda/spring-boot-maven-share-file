@@ -6,12 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
+import java.security.Principal;
 
 /**
  * @author Shylendra Madda
  */
-@RequestMapping("api/user")
+@RequestMapping("/api")
 @RestController
 public class UserController {
 
@@ -20,8 +20,8 @@ public class UserController {
 
     @ExceptionHandler(RuntimeException.class)
     @PostMapping("/register")
-    private ResponseEntity<UserDto> registerUser(@RequestBody UserDto userDto, HttpSession httpSession) {
-        return userService.registerUser(userDto, httpSession);
+    private ResponseEntity<Object> registerUser(@RequestBody UserDto userDto, Principal principal) {
+        return userService.registerUser(userDto);
     }
 
 }

@@ -8,7 +8,7 @@ import com.techatcore.sharefile.dto.ShareFileDto;
 import com.techatcore.sharefile.dto.UploadFileDto;
 import com.techatcore.sharefile.repo.FileRepo;
 import com.techatcore.sharefile.repo.UserRepo;
-import com.techatcore.sharefile.utils.Constants;
+import com.techatcore.sharefile.utils.SessionUtil;
 import com.techatcore.sharefile.utils.Utils;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpSession;
 import javax.transaction.Transactional;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -48,19 +48,19 @@ public class FileService {
     @Value("${file.upload-path}")
     private String fileUploadPath;
 
-    private User getUserFromSession(HttpSession httpSession) {
-        return (User) httpSession.getAttribute(Constants.USER);
+    private User getUserFromSession() {
+        return SessionUtil.getUser();
     }
 
-    public ResponseEntity<FilesDto> getFiles(HttpSession httpSession) {
+    public ResponseEntity<Object> getFiles() {
         try {
             log.debug("Triggered user getFiles API");
             // Get user from the session
-            User user = getUserFromSession(httpSession);
-            List<FileEntity> fileEntitiesUploaded = fileRepo.findByFrom(user);
+            User user = getUserFromSession();
+            // Get all uploaded entity files related to the user and convert to Dto
+            List<FileEntity> fileEntitiesOwned = fileRepo.findByFrom(user);
             List<FileEntity> fileEntitiesShared = fileRepo.findByTo(user);
-            // Get all uploaded entity files and convert to Dto
-            List<UploadFileDto> uploadFileDtoList = fileEntitiesUploaded
+            List<UploadFileDto> ownedFileDtoList = fileEntitiesOwned
                     .stream()
                     .map(fileEntity -> dataMapper.map(fileEntity, UploadFileDto.class))
                     .collect(Collectors.toList());
@@ -71,22 +71,22 @@ public class FileService {
                     .collect(Collectors.toList());
             // Set both into files Dto
             FilesDto filesDto = new FilesDto();
-            filesDto.setUploadedFiles(uploadFileDtoList);
+            filesDto.setOwnedFiles(ownedFileDtoList);
             filesDto.setSharedFiles(sharedFilesDtoList);
-            log.info("Returned uploaded files with count: " + uploadFileDtoList.size() +
+            log.info("Returned uploaded files with count: " + ownedFileDtoList.size() +
                     " shared files with count: " + sharedFilesDtoList.size());
             return new ResponseEntity<>(filesDto, HttpStatus.OK);
         } catch (Exception e) {
             log.error("Internal server error", e);
-            throw new RuntimeException("Internal server error");
+            return new ResponseEntity<>("Internal server error. " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public ResponseEntity<UploadFileDto> uploadFile(MultipartFile file, HttpSession httpSession) {
+    public ResponseEntity<Object> uploadFile(MultipartFile file) {
         try {
             log.debug("Triggered user uploadFile API");
             // Get user from the session
-            User user = getUserFromSession(httpSession);
+            User user = getUserFromSession();
             // Normalize file name
             String fileName = StringUtils.cleanPath(Utils.getCurrentTime() + "_" + file.getOriginalFilename());
             // Check if the file's name contains invalid characters
@@ -106,21 +106,22 @@ public class FileService {
             return new ResponseEntity<>(uploadFileDto, HttpStatus.OK);
         } catch (IOException ex) {
             log.error("Could not store file. Please try again!", ex);
-            throw new RuntimeException("Could not store file. Please try again!", ex);
+            return new ResponseEntity<>("Could not store file. Please try again! " + ex,
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
             log.error("Internal server error", e);
-            throw new RuntimeException("Internal server error", e);
+            return new ResponseEntity<>("Internal server error. " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public ResponseEntity<DownloadFileDto> downloadFile(String fileId, HttpSession httpSession) {
+    public ResponseEntity<Object> downloadFile(String fileId) {
         try {
             log.debug("Triggered user downloadFile API");
             // Get user from the session
-            User user = getUserFromSession(httpSession);
+            User user = getUserFromSession();
             Optional<FileEntity> fileEntity = fileRepo.findById(fileId);
             // Check is this file uploaded by the same user
-            if (fileEntity.isPresent() && fileEntity.get().getFrom().getId().equals(user.getId())) {
+            if (fileEntity.isPresent() && fileEntity.get().getFrom().getId().equals(Objects.requireNonNull(user).getId())) {
                 String file = new String(Files.readAllBytes(Paths.get(fileUploadPath + fileEntity.get().getFileName())));
                 String encodedString = Base64.getEncoder().encodeToString(file.getBytes());
                 DownloadFileDto downloadFileDto = new DownloadFileDto();
@@ -132,18 +133,19 @@ public class FileService {
             throw new RuntimeException("File not found with this ID: " + fileId + ". Please try again!");
         } catch (IOException ex) {
             log.error("File not found with this ID: " + fileId + ". Please try again!", ex);
-            throw new RuntimeException("File not found with this ID: " + fileId + ". Please try again!", ex);
+            return new ResponseEntity<>("File not found with this ID: " + fileId + ". Please try again! " + ex.toString(),
+                    HttpStatus.NOT_FOUND);
         } catch (Exception e) {
             log.error("Internal server error", e);
-            throw new RuntimeException("Internal server error", e);
+            return new ResponseEntity<>("Internal server error. " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public ResponseEntity<ShareFileDto> shareFile(ShareFileDto shareFileDto, HttpSession httpSession) {
+    public ResponseEntity<Object> shareFile(ShareFileDto shareFileDto) {
         try {
             log.debug("Triggered user shareFile API");
             // Get user from the session
-            User userFromSession = getUserFromSession(httpSession);
+            User userFromSession = getUserFromSession();
             FileEntity fileEntity = dataMapper.map(shareFileDto, FileEntity.class);
             // Get the user list from entity to share the file
             List<User> userList = fileEntity.getTo().stream()
@@ -154,17 +156,17 @@ public class FileService {
             fileEntity.setTo(userList);
             Optional<FileEntity> fileData = fileRepo.findById(fileEntity.getId());
             // Check is this file uploaded by the same user
-            if (fileData.isPresent() && fileData.get().getFrom().getId().equals(userFromSession.getId())) {
+            if (fileData.isPresent() && fileData.get().getFrom().getId().equals(Objects.requireNonNull(userFromSession).getId())) {
                 FileEntity entity = fileRepo.save(fileEntity);
                 ShareFileDto fileDto = dataMapper.map(entity, ShareFileDto.class);
                 return new ResponseEntity<>(fileDto, HttpStatus.OK);
             } else {
                 log.error("User does not having permission to share this file!");
-                throw new RuntimeException("User does not having permission to share this file!");
+                return new ResponseEntity<>("User does not having permission to share this file!", HttpStatus.FORBIDDEN);
             }
         } catch (Exception e) {
             log.error("Internal server error", e);
-            throw new RuntimeException("Internal server error", e);
+            return new ResponseEntity<>("Internal server error. " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

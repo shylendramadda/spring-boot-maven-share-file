@@ -3,11 +3,15 @@ package com.techatcore.sharefile.domain;
 import lombok.Data;
 import org.hibernate.annotations.GenericGenerator;
 
-import javax.persistence.*;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 
+/**
+ * @author Shylendra Madda
+ */
 @Entity
 @Data
-@Table(indexes = {@Index(name = "email", columnList = "id,email")})
 public class User {
     @Id
     @GeneratedValue(generator = "uuid")
@@ -15,4 +19,5 @@ public class User {
     private String id;
     private String email;
     private String password;
+    private String roles;
 }

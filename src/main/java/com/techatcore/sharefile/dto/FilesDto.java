@@ -9,6 +9,6 @@ import java.util.List;
  */
 @Data
 public class FilesDto {
-    private List<UploadFileDto> uploadedFiles;
+    private List<UploadFileDto> ownedFiles;
     private List<ShareFileDto> sharedFiles;
 }

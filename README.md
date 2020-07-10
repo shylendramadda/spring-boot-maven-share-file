@@ -5,15 +5,14 @@ Goal of this project is to create service for file sharing (Upload, download, sh
 - Spring Boot 2.3.1
 - Java 1.8
 - JPA
+- Maven
 - Restfull
 - Lombok
-- Map Struct 1.3.1.Final
+- MapStruct 1.3.1.Final
 - ModelMapper 2.3.0
 - H2 Database
-- Spring security
-- Maven
-- Swagger2 2.9.2
-- SwaggerUI 2.9.2
+- Spring security (Basic Auth)
+- SpringDocOpenApi (Swagger) 1.2.32
 
 ### Endpoint Exposed Endpoints:
 - POST /api/register (Register User)
