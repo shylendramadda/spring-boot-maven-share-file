@@ -6,6 +6,7 @@ import org.hibernate.annotations.GenericGenerator;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Transient;
 
 /**
  * @author Shylendra Madda
@@ -20,4 +21,5 @@ public class User {
     private String email;
     private String password;
     private String roles;
+
 }

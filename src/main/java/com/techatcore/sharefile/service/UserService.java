@@ -3,6 +3,7 @@ package com.techatcore.sharefile.service;
 import com.techatcore.sharefile.domain.User;
 import com.techatcore.sharefile.dto.UserDto;
 import com.techatcore.sharefile.repo.UserRepo;
+import com.techatcore.sharefile.utils.SecurityUserDetails;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;

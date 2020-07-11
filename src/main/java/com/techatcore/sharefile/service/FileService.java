@@ -25,10 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Base64;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -58,15 +55,15 @@ public class FileService {
             // Get user from the session
             User user = getUserFromSession();
             // Get all uploaded entity files related to the user and convert to Dto
-            List<FileEntity> fileEntitiesOwned = fileRepo.findByFrom(user);
-            List<FileEntity> fileEntitiesShared = fileRepo.findByTo(user);
-            List<UploadFileDto> ownedFileDtoList = fileEntitiesOwned
+            List<FileEntity> fileEntities = fileRepo.findByFrom(user);
+            List<UploadFileDto> ownedFileDtoList = fileEntities
                     .stream()
                     .map(fileEntity -> dataMapper.map(fileEntity, UploadFileDto.class))
                     .collect(Collectors.toList());
             // Get all shared entity files and convert to Dto
-            List<ShareFileDto> sharedFilesDtoList = fileEntitiesShared
+            List<ShareFileDto> sharedFilesDtoList = fileEntities
                     .stream()
+                    .map(fileEntity -> fileEntity.getTo().stream().map(user1 -> fileRepo.findById(user1.getId())))
                     .map(sharedFile -> dataMapper.map(sharedFile, ShareFileDto.class))
                     .collect(Collectors.toList());
             // Set both into files Dto
@@ -101,9 +98,9 @@ public class FileService {
             fileEntity.setFrom(user);
             // Save file entity
             FileEntity uploadedFile = fileRepo.save(fileEntity);
-            UploadFileDto uploadFileDto = dataMapper.map(uploadedFile, UploadFileDto.class);
             log.info("File uploaded with file Id: " + uploadedFile.getId());
-            return new ResponseEntity<>(uploadFileDto, HttpStatus.OK);
+            return new ResponseEntity<>("Successfully uploaded the file with id: " + uploadedFile.getId(),
+                    HttpStatus.OK);
         } catch (IOException ex) {
             log.error("Could not store file. Please try again!", ex);
             return new ResponseEntity<>("Could not store file. Please try again! " + ex,
@@ -146,24 +143,25 @@ public class FileService {
             log.debug("Triggered user shareFile API");
             // Get user from the session
             User userFromSession = getUserFromSession();
-            FileEntity fileEntity = dataMapper.map(shareFileDto, FileEntity.class);
-            // Get the user list from entity to share the file
-            List<User> userList = fileEntity.getTo().stream()
-                    .map(user -> userRepo.findById(user.getId()))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .collect(Collectors.toList());
-            fileEntity.setTo(userList);
-            Optional<FileEntity> fileData = fileRepo.findById(fileEntity.getId());
-            // Check is this file uploaded by the same user
-            if (fileData.isPresent() && fileData.get().getFrom().getId().equals(Objects.requireNonNull(userFromSession).getId())) {
-                FileEntity entity = fileRepo.save(fileEntity);
-                ShareFileDto fileDto = dataMapper.map(entity, ShareFileDto.class);
-                return new ResponseEntity<>(fileDto, HttpStatus.OK);
-            } else {
+            String fileId = shareFileDto.getId();
+            // Check exist or not given file id
+            FileEntity dbFileEntity = fileRepo.findById(fileId).orElse(null);
+            if (dbFileEntity != null) {
+                // Make sure is have a access to sure
+                if (dbFileEntity.getFrom().getId().equals(Objects.requireNonNull(userFromSession).getId())) {
+                    // Share file to others
+                    List<User> toUserIds = shareFileDto.getTo();
+                    List<User> toUsers = toUserIds.stream().map(user -> {
+                        return userRepo.findById(user.getId()).get();
+                    }).collect(Collectors.toList());
+                    dbFileEntity.setTo(toUsers);
+                    fileRepo.save(dbFileEntity);
+                    return new ResponseEntity<>("Successfully shared the file", HttpStatus.OK);
+                }
                 log.error("User does not having permission to share this file!");
                 return new ResponseEntity<>("User does not having permission to share this file!", HttpStatus.FORBIDDEN);
             }
+            return new ResponseEntity<>("File does not exist", HttpStatus.NOT_FOUND);
         } catch (Exception e) {
             log.error("Internal server error", e);
             return new ResponseEntity<>("Internal server error. " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
